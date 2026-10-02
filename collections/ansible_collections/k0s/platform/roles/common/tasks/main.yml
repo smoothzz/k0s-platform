@@ -1,0 +1,66 @@
+---
+- name: Ensure base packages are present
+  ansible.builtin.package:
+    name: "{{ k0s_base_packages }}"
+    state: present
+
+- name: Set the system hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+  when: k0s_set_hostname | bool
+
+- name: Add all cluster nodes to /etc/hosts
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED k0s cluster"
+    block: |
+      {% for host in groups['k0s_cluster'] | sort %}
+      {{ hostvars[host].ansible_host | default(host) }} {{ host }}
+      {% endfor %}
+
+- name: Disable swap at runtime
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+  when: k0s_disable_swap | bool
+
+- name: Disable swap in /etc/fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s+.*)$'
+    replace: '# \1'
+  when: k0s_disable_swap | bool
+
+- name: Persist required kernel modules
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k0s.conf
+    mode: "0644"
+    content: |
+      overlay
+      br_netfilter
+  when: k0s_load_kernel_modules | bool
+
+- name: Load required kernel modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  when: k0s_load_kernel_modules | bool
+
+- name: Apply required sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+    reload: true
+  loop: "{{ k0s_sysctl }}"
+  when: k0s_configure_sysctl | bool
+
+- name: Install the k0s binary
+  ansible.builtin.import_tasks: install_k0s.yml
+
+- name: Configure the host firewall
+  ansible.builtin.import_tasks: firewall.yml
+  when: k0s_manage_firewall | bool

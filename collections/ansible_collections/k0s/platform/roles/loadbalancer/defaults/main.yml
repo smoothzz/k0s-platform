@@ -1,0 +1,31 @@
+---
+# Which L4 proxy sits in front of the controllers.
+#   envoy   - Envoy (cloud-native, xDS-ready)
+#   haproxy - HAProxy
+k0s_lb_engine: envoy
+
+# Floating VIP (VRRP). Envoy has no VRRP, so keepalived provides the VIP for
+# either engine. True only for the multi-LB topology (ha-lb-ha); a single LB
+# node (ha-lb-single) uses its own IP.
+k0s_lb_vip_enabled: "{{ k0s_topology == 'ha-lb-ha' }}"
+k0s_lb_vip: ""
+k0s_lb_interface: ""
+k0s_lb_vrrp_id: 51
+k0s_lb_auth_pass: k0s
+
+# HAProxy only: stats page.
+k0s_lb_stats_port: 9000
+
+# Envoy only.
+k0s_lb_envoy_version: latest            # "latest" or pin, e.g. "1.39.1"
+k0s_lb_envoy_binary: /usr/local/bin/envoy
+k0s_lb_envoy_config_dir: /etc/envoy
+k0s_lb_envoy_admin_address: 127.0.0.1
+k0s_lb_envoy_admin_port: 9901
+k0s_lb_envoy_cluster_type: STATIC       # STATIC (IPs) | STRICT_DNS (hostnames)
+
+# Backends proxied to every controller. These are the k0s control plane ports.
+k0s_lb_backends:
+  - { name: kube_api,        port: 6443 }   # Kubernetes API
+  - { name: konnectivity,    port: 8132 }   # konnectivity
+  - { name: controller_join, port: 9443 }   # k0s controller join API

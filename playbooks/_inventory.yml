@@ -1,0 +1,29 @@
+---
+# Shared play: turn the k0s_*_hosts lists in group_vars/all.yml into live
+# inventory groups. Imported by site.yml and kubeconfig.yml.
+- name: Build the cluster inventory from group_vars
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Add the master (controller) nodes
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        ansible_host: "{{ item.ip }}"
+        groups: k0s_controllers
+      loop: "{{ k0s_controllers_hosts | default([]) }}"
+
+    - name: Add the worker nodes
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        ansible_host: "{{ item.ip }}"
+        groups: k0s_workers
+      loop: "{{ k0s_workers_hosts | default([]) }}"
+
+    - name: Add the load balancer nodes
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        ansible_host: "{{ item.ip }}"
+        groups: k0s_lb
+      loop: "{{ k0s_lb_hosts | default([]) }}"

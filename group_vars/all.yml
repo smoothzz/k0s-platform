@@ -1,0 +1,110 @@
+---
+# =============================================================================
+#  k0s cluster settings - this is the only file you normally edit
+# =============================================================================
+
+# --- Topology ---------------------------------------------------------------
+# Choose ONE of:
+#   single       - 1 controller, all-in-one (controller+worker, kine). No LB.
+#   ha-cplb      - 3/5 controllers; k0s built-in CPLB (keepalived VIP lives on
+#                  the controllers). No external LB hosts.
+#   ha-lb-single - 3/5 controllers; ONE external LB host (Envoy). No VIP takeover.
+#   ha-lb-ha     - 3/5 controllers; 2+ external LB hosts (Envoy) with a
+#                  floating VIP (keepalived).
+k0s_topology: ha-lb-ha
+
+# Derived from k0s_topology - override only if you know what you're doing.
+k0s_ha: "{{ k0s_topology != 'single' }}"
+k0s_cplb_enabled: "{{ k0s_topology == 'ha-cplb' }}"
+k0s_lb_vip_enabled: "{{ k0s_topology == 'ha-lb-ha' }}"
+
+# --- k0s version ------------------------------------------------------------
+# "latest", or pin a release such as "v1.31.2+k0s.0"
+k0s_version: latest
+
+# --- Nodes ------------------------------------------------------------------
+# List every machine here. "name" becomes the hostname label, "ip" is the SSH
+# target.
+#   single       -> exactly 1 master, k0s_lb_hosts empty
+#   ha-cplb      -> 3/5 masters, k0s_lb_hosts empty
+#   ha-lb-single -> 3/5 masters, exactly 1 LB host
+#   ha-lb-ha     -> 3/5 masters, 2+ LB hosts
+k0s_controllers_hosts:
+  - { name: ctrl-1, ip: 192.168.1.11 }
+  - { name: ctrl-2, ip: 192.168.1.12 }
+  - { name: ctrl-3, ip: 192.168.1.13 }
+
+k0s_workers_hosts:
+  - { name: worker-1, ip: 192.168.1.21 }
+  - { name: worker-2, ip: 192.168.1.22 }
+
+k0s_lb_hosts:
+  - { name: lb-1, ip: 192.168.1.10 }
+  - { name: lb-2, ip: 192.168.1.9 }
+
+# --- SSH / privilege escalation (applies to every node) ---------------------
+ansible_user: ubuntu
+# ansible_password: "secret"          # only when not using SSH keys
+# ansible_become_password: "secret"   # only when sudo requires a password
+
+# --- Cluster VIP ------------------------------------------------------------
+# The single stable address clients use. Meaning depends on topology:
+#   ha-cplb      -> VIP keepalived floats across the controllers
+#   ha-lb-single -> the LB host's own IP
+#   ha-lb-ha     -> VIP keepalived floats across the LB hosts
+k0s_lb_vip: "192.168.1.100"
+# NIC that carries the VIP. Required for ha-lb-ha (keepalived). For ha-cplb
+# leave k0s_cplb_interface empty to let k0s auto-detect the default-route NIC.
+k0s_lb_interface: "ens192"
+
+# --- External load balancer (ha-lb-single / ha-lb-ha) -----------------------
+# L4 proxy engine: "envoy" (default) or "haproxy".
+k0s_lb_engine: envoy
+k0s_lb_vrrp_id: 51
+# Envoy release to install: "latest" or a pinned version, e.g. "1.39.1".
+k0s_lb_envoy_version: latest
+
+# --- CPLB (ha-cplb) ---------------------------------------------------------
+k0s_cplb_auth_pass: k0s
+# VIP with netmask, as required by keepalived.
+k0s_cplb_vip_cidr: "{{ k0s_lb_vip }}/24"
+# Optional: pin the CPLB VRRP interface. Empty = k0s auto-detects.
+k0s_cplb_interface: ""
+# VRRP unicast. Set true when multicast does not work on the network
+# (e.g. VMware NAT). Peers/source are derived automatically; override only if
+# your node IPs differ from their SSH targets.
+k0s_cplb_unicast: false
+# k0s_cplb_unicast_source_ip: ""   # default: this node's primary IP
+# k0s_cplb_unicast_peers: []       # default: the other controllers' IPs
+
+# --- CNI --------------------------------------------------------------------
+# kuberouter (default) | calico | cilium
+#   kuberouter / calico are built into k0s.
+#   cilium is deployed as a custom CNI via k0s's Helm extension, with
+#   kube-proxy replacement enabled.
+k0s_cni: kuberouter
+
+# Cilium only (k0s_cni: cilium):
+k0s_cilium_version: "1.17.1"
+k0s_cilium_kube_proxy_replacement: true
+k0s_cilium_operator_replicas: 1
+k0s_cilium_ipv4_mask_size: 24
+# k0s_cilium_k8s_service_host: ""   # default: the VIP (HA) or first controller IP
+# k0s_cilium_extra_values: {}       # deep-merged over the generated values
+
+# --- Cluster networking -----------------------------------------------------
+k0s_cluster_name: k0s
+k0s_pod_cidr: 10.244.0.0/16
+k0s_service_cidr: 10.96.0.0/12
+
+# --- Misc -------------------------------------------------------------------
+k0s_telemetry_enabled: false
+k0s_manage_firewall: false
+
+# Extra k0s ClusterConfig spec, deep-merged over the generated defaults.
+# Example:
+#   k0s_config_extra:
+#     api:
+#       extraArgs:
+#         audit-log-maxage: "30"
+k0s_config_extra: {}

@@ -1,0 +1,12 @@
+---
+- name: Install and configure HAProxy
+  ansible.builtin.include_tasks: haproxy.yml
+  when: k0s_lb_engine == 'haproxy'
+
+- name: Install and configure Envoy
+  ansible.builtin.include_tasks: envoy.yml
+  when: k0s_lb_engine == 'envoy'
+
+- name: Configure a floating VIP with keepalived
+  ansible.builtin.import_tasks: keepalived.yml
+  when: k0s_lb_vip_enabled | bool

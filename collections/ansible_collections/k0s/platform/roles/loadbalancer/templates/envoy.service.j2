@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Envoy TCP load balancer for the k0s control plane
+Documentation=https://www.envoyproxy.io/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart={{ k0s_lb_envoy_binary }} --config-path {{ k0s_lb_envoy_config_dir }}/envoy.yaml --service-cluster k0s-lb --service-node k0s-lb
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

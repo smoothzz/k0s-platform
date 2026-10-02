@@ -1,0 +1,49 @@
+---
+- name: Get a controller join token from the primary controller
+  ansible.builtin.command: >-
+    k0s token create --role=controller
+    --expiry={{ k0s_controller_join_token_expiry }}
+  delegate_to: "{{ groups['k0s_controllers'][0] }}"
+  register: k0s_controller_join_token
+  changed_when: false
+
+- name: Store the controller join token
+  ansible.builtin.copy:
+    content: "{{ k0s_controller_join_token.stdout }}\n"
+    dest: /etc/k0s/controller.token
+    mode: "0600"
+
+- name: Check whether the controller service is already installed
+  ansible.builtin.stat:
+    path: /etc/systemd/system/k0scontroller.service
+  register: k0s_controller_service
+
+- name: (Re)install and start the controller service
+  when: not k0s_controller_service.stat.exists or k0s_controller_config.changed
+  block:
+    - name: Stop k0s before reconfiguring
+      ansible.builtin.command: k0s stop
+      failed_when: false
+      changed_when: false
+
+    - name: Install controller service and join the cluster
+      ansible.builtin.command: >-
+        k0s install controller
+        --config /etc/k0s/k0s.yaml
+        --token-file /etc/k0s/controller.token
+        {{ '--enable-worker' if k0s_controller_enable_worker | bool else '' }}
+        {{ k0s_controller_extra_args }}
+        --force
+      changed_when: true
+
+    - name: Start k0s
+      ansible.builtin.command: k0s start
+      changed_when: true
+
+- name: Wait for the controller process to be up
+  ansible.builtin.command: k0s status
+  register: k0s_controller_status
+  until: "'Role: controller' in k0s_controller_status.stdout"
+  retries: 30
+  delay: 5
+  changed_when: false

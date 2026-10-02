@@ -1,0 +1,70 @@
+---
+# =============================================================================
+#  List available k0s versions, so you can pick one for `k0s_version`.
+#
+#    ansible-playbook playbooks/k0s-versions.yml
+#    ansible-playbook playbooks/k0s-versions.yml -e k0s_versions_filter=v1.31
+#    ansible-playbook playbooks/k0s-versions.yml -e k0s_versions_limit=50
+#    ansible-playbook playbooks/k0s-versions.yml -e k0s_versions_include_prerelease=true
+# =============================================================================
+- name: List available k0s versions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    k0s_versions_filter: ""            # e.g. "v1.31" or "1.31"
+    k0s_versions_limit: 30
+    k0s_versions_include_prerelease: false
+  tasks:
+    - name: Fetch k0s releases from GitHub
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/k0sproject/k0s/releases?per_page=100"
+        return_content: true
+        status_code: 200
+        headers:
+          Accept: application/vnd.github+json
+          User-Agent: k0s-platform
+      register: k0s_releases
+      failed_when: false
+
+    - name: Explain how to proceed when the fetch fails
+      ansible.builtin.fail:
+        msg: >-
+          Could not fetch k0s releases (HTTP {{ k0s_releases.status | default('n/a') }}).
+          {% if k0s_releases.status | default(0) == 403 %}
+          That is usually the unauthenticated GitHub API rate limit; wait a bit and retry.
+          {% else %}
+          Check network access to api.github.com.
+          {% endif %}
+      when: k0s_releases.status | default(0) != 200
+
+    - name: Collect all release tags
+      ansible.builtin.set_fact:
+        k0s_all_versions: "{{ k0s_releases.json | map(attribute='tag_name') | list }}"
+
+    - name: Filter the versions
+      ansible.builtin.set_fact:
+        k0s_shown_versions: >-
+          {{
+            (k0s_all_versions
+             | select('search', k0s_versions_filter)
+             | reject('search', '-(alpha|beta|rc|head)')
+             | list)
+            if not (k0s_versions_include_prerelease | bool)
+            else (k0s_all_versions | select('search', k0s_versions_filter) | list)
+          }}
+
+    - name: Show the newest versions
+      ansible.builtin.debug:
+        msg: "{{ k0s_shown_versions[: (k0s_versions_limit | int)] }}"
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "Configured k0s_version: {{ k0s_version | default('latest') }}"
+          - "Matching versions found: {{ k0s_shown_versions | length }}"
+          - "Showing the newest {{ k0s_versions_limit }} (raise with -e k0s_versions_limit=N)"
+          - >-
+            Pick one and set it in group_vars/all.yml, e.g.
+            k0s_version: {{ k0s_shown_versions[0] | default('vX.Y.Z+k0s.0') }}

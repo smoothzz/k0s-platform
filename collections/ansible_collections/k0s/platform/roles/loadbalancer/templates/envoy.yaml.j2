@@ -1,0 +1,52 @@
+# {{ ansible_managed }}
+node:
+  id: k0s-lb
+  cluster: k0s-lb
+
+admin:
+  address:
+    socket_address:
+      address: {{ k0s_lb_envoy_admin_address }}
+      port_value: {{ k0s_lb_envoy_admin_port }}
+
+static_resources:
+  listeners:
+{% for backend in k0s_lb_backends %}
+    - name: {{ backend.name }}
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: {{ backend.port }}
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.tcp_proxy
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+                stat_prefix: {{ backend.name }}
+                cluster: {{ backend.name }}_cluster
+{% endfor %}
+
+  clusters:
+{% for backend in k0s_lb_backends %}
+    - name: {{ backend.name }}_cluster
+      connect_timeout: 5s
+      type: {{ k0s_lb_envoy_cluster_type }}
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: {{ backend.name }}_cluster
+        endpoints:
+          - lb_endpoints:
+{% for host in groups['k0s_controllers'] %}
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: {{ hostvars[host].ansible_host | default(host) }}
+                      port_value: {{ backend.port }}
+{% endfor %}
+      health_checks:
+        - timeout: 1s
+          interval: 5s
+          unhealthy_threshold: 3
+          healthy_threshold: 1
+          tcp_health_check: {}
+{% endfor %}

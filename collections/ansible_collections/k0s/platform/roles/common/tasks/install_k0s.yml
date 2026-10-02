@@ -1,0 +1,37 @@
+---
+- name: Check for an existing k0s binary
+  ansible.builtin.command: k0s version
+  register: k0s_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Decide whether k0s must be (re)installed
+  ansible.builtin.set_fact:
+    k0s_needs_install: >-
+      {{
+        k0s_version_check.rc != 0
+        or (k0s_version != 'latest'
+            and k0s_version not in (k0s_version_check.stdout | default('')))
+      }}
+
+- name: Install k0s (latest)
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -sSLf https://get.k0s.sh | sh
+  args:
+    executable: /bin/bash
+  when:
+    - k0s_needs_install | bool
+    - k0s_version == 'latest'
+  changed_when: true
+
+- name: Install k0s ({{ k0s_version }})
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -sSLf https://get.k0s.sh | K0S_VERSION={{ k0s_version }} sh
+  args:
+    executable: /bin/bash
+  when:
+    - k0s_needs_install | bool
+    - k0s_version != 'latest'
+  changed_when: true

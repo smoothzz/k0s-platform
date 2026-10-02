@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+vrrp_instance k0s_control_plane {
+    state {{ 'MASTER' if groups['k0s_lb'].index(inventory_hostname) == 0 else 'BACKUP' }}
+    interface {{ k0s_lb_interface }}
+    virtual_router_id {{ k0s_lb_vrrp_id }}
+    priority {{ 100 + (groups['k0s_lb'] | length) - groups['k0s_lb'].index(inventory_hostname) }}
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass {{ k0s_lb_auth_pass }}
+    }
+    virtual_ipaddress {
+        {{ k0s_lb_vip }}
+    }
+}

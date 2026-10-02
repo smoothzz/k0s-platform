@@ -1,0 +1,25 @@
+---
+namespace: k0s
+name: platform
+version: 1.0.0
+readme: README.md
+authors:
+  - thiago
+description: >-
+  Install and manage multi-node k0s Kubernetes clusters with selectable
+  topologies (single, CPLB HA, single external LB, multi external LB HA)
+  and selectable CNI (kuberouter, calico, cilium).
+license:
+  - MIT
+tags:
+  - kubernetes
+  - k0s
+  - cluster
+  - highavailability
+  - etcd
+dependencies: {}
+repository: https://github.com/example/k0s-platform
+documentation: https://github.com/example/k0s-platform
+issues: https://github.com/example/k0s-platform/issues
+build_ignore:
+  - "*.tar.gz"

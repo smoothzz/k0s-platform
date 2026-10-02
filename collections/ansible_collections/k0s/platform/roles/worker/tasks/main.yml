@@ -1,0 +1,75 @@
+---
+- name: Verify the k0s binary is installed
+  ansible.builtin.command: k0s version
+  register: k0s_present
+  changed_when: false
+  failed_when: false
+
+- name: Fail when k0s is missing
+  ansible.builtin.fail:
+    msg: "k0s is not installed on {{ inventory_hostname }}. Run the 'common' role first."
+  when: k0s_present.rc != 0
+
+- name: Ensure /etc/k0s exists
+  ansible.builtin.file:
+    path: /etc/k0s
+    state: directory
+    mode: "0755"
+
+- name: Check whether the worker service is already installed
+  ansible.builtin.stat:
+    path: /etc/systemd/system/k0sworker.service
+  register: k0s_worker_service
+
+- name: Write the worker configuration
+  ansible.builtin.template:
+    src: worker-config.yaml.j2
+    dest: /etc/k0s/worker.yaml
+    mode: "0600"
+  when: k0s_worker_config | length > 0
+  register: k0s_worker_config_file
+
+- name: (Re)install and start the worker service
+  when: >-
+    not k0s_worker_service.stat.exists
+    or (k0s_worker_config_file is defined and k0s_worker_config_file.changed)
+  block:
+    - name: Get a worker join token from the primary controller
+      ansible.builtin.command: >-
+        k0s token create --role=worker
+        --expiry={{ k0s_worker_join_token_expiry }}
+      delegate_to: "{{ groups['k0s_controllers'][0] }}"
+      register: k0s_worker_join_token
+      changed_when: false
+
+    - name: Store the worker join token
+      ansible.builtin.copy:
+        content: "{{ k0s_worker_join_token.stdout }}\n"
+        dest: /etc/k0s/worker.token
+        mode: "0600"
+
+    - name: Stop k0s before reconfiguring
+      ansible.builtin.command: k0s stop
+      failed_when: false
+      changed_when: false
+
+    - name: Install worker service and join the cluster
+      ansible.builtin.command: >-
+        k0s install worker
+        --token-file /etc/k0s/worker.token
+        {{ '--config /etc/k0s/worker.yaml' if (k0s_worker_config | length > 0) else '' }}
+        {{ k0s_worker_extra_args }}
+        --force
+      changed_when: true
+
+    - name: Start k0s
+      ansible.builtin.command: k0s start
+      changed_when: true
+
+- name: Wait for the worker process to be up
+  ansible.builtin.command: k0s status
+  register: k0s_worker_status
+  until: "'Role: worker' in k0s_worker_status.stdout"
+  retries: 30
+  delay: 5
+  changed_when: false

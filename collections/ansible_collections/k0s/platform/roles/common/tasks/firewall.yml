@@ -1,0 +1,27 @@
+---
+- name: Detect ufw
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: k0s_ufw_bin
+
+- name: Detect firewalld
+  ansible.builtin.stat:
+    path: /usr/sbin/firewall-cmd
+  register: k0s_firewalld_bin
+
+- name: Allow k0s ports with ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ k0s_firewall_ports }}"
+  when: k0s_ufw_bin.stat.exists
+
+- name: Allow k0s ports with firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ k0s_firewall_ports }}"
+  when: k0s_firewalld_bin.stat.exists

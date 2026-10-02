@@ -1,0 +1,65 @@
+---
+# Derived from k0s_topology (see group_vars/all.yml).
+k0s_ha: "{{ k0s_topology != 'single' }}"
+k0s_cplb_enabled: "{{ k0s_topology == 'ha-cplb' }}"
+
+k0s_primary: false
+k0s_lb_vip: ""
+
+# The address all cluster components use to reach the API server. When HA is
+# enabled this is the VIP / LB address (k0s spec.api.externalAddress).
+k0s_api_external_address: "{{ k0s_lb_vip if (k0s_ha | bool) else '' }}"
+
+k0s_api_sans: []
+k0s_api_port: 6443
+k0s_api_k0s_port: 9443
+
+k0s_cluster_name: k0s
+
+# etcd for HA, kine (SQLite) for single-node mode.
+k0s_datastore: "{{ 'etcd' if (k0s_ha | bool) else 'kine' }}"
+k0s_etcd_peer_address: "{{ ansible_default_ipv4.address | default(ansible_host) }}"
+
+# --- CNI --------------------------------------------------------------------
+# kuberouter | calico | cilium
+#   kuberouter / calico are built into k0s.
+#   cilium is deployed as a custom CNI via k0s's Helm extension, with
+#   kube-proxy replacement.
+k0s_cni: kuberouter
+k0s_network_provider: "{{ 'custom' if k0s_cni == 'cilium' else k0s_cni }}"
+k0s_disable_kube_proxy: >-
+  {{ (k0s_cni == 'cilium') and (k0s_cilium_kube_proxy_replacement | bool) }}
+
+# Cilium only.
+k0s_cilium_version: "1.17.1"
+k0s_cilium_kube_proxy_replacement: true
+k0s_cilium_operator_replicas: 1
+k0s_cilium_ipv4_mask_size: 24
+k0s_cilium_k8s_service_host: ""
+k0s_cilium_k8s_service_port: 6443
+k0s_cilium_extra_values: {}
+
+# CPLB (k0s_topology == 'ha-cplb').
+k0s_cplb_auth_pass: k0s
+k0s_cplb_vip_cidr: "{{ k0s_lb_vip }}/24"
+k0s_cplb_interface: ""
+
+# VRRP unicast. Enable when multicast does not work on the network (e.g. NAT).
+#   k0s_cplb_unicast_source_ip -> this controller's own IP (default: primary IP)
+#   k0s_cplb_unicast_peers     -> the other controllers' IPs (default: derived)
+k0s_cplb_unicast: false
+k0s_cplb_unicast_source_ip: ""
+k0s_cplb_unicast_peers: []
+
+k0s_pod_cidr: 10.244.0.0/16
+k0s_service_cidr: 10.96.0.0/12
+
+k0s_telemetry_enabled: false
+k0s_config_extra: {}
+
+# Run workloads on controller nodes in HA mode (ignored in single-node mode,
+# where --single already implies --enable-worker).
+k0s_controller_enable_worker: false
+k0s_controller_extra_args: ""
+
+k0s_controller_join_token_expiry: 1h

@@ -1,0 +1,39 @@
+---
+k0s_version: latest
+
+k0s_base_packages:
+  - curl
+  - ca-certificates
+  - iptables
+  - conntrack
+  - socat
+  - iproute2
+  - apparmor
+
+k0s_set_hostname: true
+k0s_disable_swap: true
+k0s_load_kernel_modules: true
+k0s_configure_sysctl: true
+
+k0s_sysctl:
+  - name: net.bridge.bridge-nf-call-iptables
+    value: "1"
+  - name: net.bridge.bridge-nf-call-ip6tables
+    value: "1"
+  - name: net.ipv4.ip_forward
+    value: "1"
+  - name: net.ipv6.conf.all.forwarding
+    value: "1"
+
+# Firewall handling is opt-in. Ports below cover the k0s control plane,
+# kubelet, and the CNI overlays (Calico / Cilium).
+k0s_manage_firewall: false
+k0s_firewall_ports:
+  - 6443    # Kubernetes API
+  - 8132    # konnectivity
+  - 9443    # k0s controller join API
+  - 10250   # kubelet
+  - 179     # Calico BGP
+  - 4789    # Calico VXLAN
+  - 8472    # Cilium VXLAN
+  - 4240    # Cilium health

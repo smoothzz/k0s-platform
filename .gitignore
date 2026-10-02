@@ -1,0 +1,18 @@
+# Collection build artifacts
+*.tar.gz
+*.tar
+
+# Ansible
+*.retry
+.ansible/
+.vault_pass
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+*.swp
+*~

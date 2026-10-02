@@ -1,0 +1,7 @@
+---
+# Optional WorkerConfig (full k0s.k0sproject.io/v1beta1 WorkerConfig document).
+# When empty no worker config file is written.
+k0s_worker_config: {}
+
+k0s_worker_extra_args: ""
+k0s_worker_join_token_expiry: 24h

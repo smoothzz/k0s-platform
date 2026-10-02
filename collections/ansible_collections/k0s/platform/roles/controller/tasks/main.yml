@@ -1,0 +1,184 @@
+---
+- name: Verify the k0s binary is installed
+  ansible.builtin.command: k0s version
+  register: k0s_present
+  changed_when: false
+  failed_when: false
+
+- name: Fail when k0s is missing
+  ansible.builtin.fail:
+    msg: "k0s is not installed on {{ inventory_hostname }}. Run the 'common' role first."
+  when: k0s_present.rc != 0
+
+- name: Ensure /etc/k0s exists
+  ansible.builtin.file:
+    path: /etc/k0s
+    state: directory
+    mode: "0755"
+
+- name: Install keepalived (used by k0s CPLB)
+  ansible.builtin.package:
+    name: keepalived
+    state: present
+  when: k0s_cplb_enabled | bool
+
+- name: Build the effective API certificate SANs
+  ansible.builtin.set_fact:
+    k0s_effective_sans: >-
+      {{
+        (k0s_api_sans
+         + ([k0s_lb_vip] if (k0s_ha | bool and k0s_lb_vip | length > 0) else []))
+        | unique
+      }}
+
+- name: Determine the CPLB unicast source address
+  ansible.builtin.set_fact:
+    k0s_cplb_unicast_source: >-
+      {{
+        k0s_cplb_unicast_source_ip
+        if (k0s_cplb_unicast_source_ip | length > 0)
+        else (ansible_default_ipv4.address | default(ansible_host))
+      }}
+
+- name: Determine the CPLB unicast peers (all controllers except this one)
+  ansible.builtin.set_fact:
+    k0s_cplb_unicast_peers_effective: >-
+      {{
+        k0s_cplb_unicast_peers
+        if (k0s_cplb_unicast_peers | length > 0)
+        else (groups['k0s_controllers']
+              | map('extract', hostvars, 'ansible_host')
+              | list
+              | difference([k0s_cplb_unicast_source]))
+      }}
+
+- name: Build the CPLB spec
+  ansible.builtin.set_fact:
+    k0s_cplb_spec: >-
+      {{
+        {
+          'enabled': true,
+          'type': 'Keepalived',
+          'keepalived': {
+            'vrrpInstances': [
+              ({'virtualIPs': [k0s_cplb_vip_cidr], 'authPass': k0s_cplb_auth_pass}
+               | combine({'interface': k0s_cplb_interface}
+                         if k0s_cplb_interface | length > 0 else {})
+               | combine({'unicastSourceIP': k0s_cplb_unicast_source,
+                          'unicastPeers': k0s_cplb_unicast_peers_effective}
+                         if (k0s_cplb_unicast | bool) else {}))
+            ]
+          }
+        }
+        if (k0s_cplb_enabled | bool) else {}
+      }}
+
+- name: Determine the Cilium API service host
+  ansible.builtin.set_fact:
+    k0s_cilium_service_host: >-
+      {{
+        k0s_cilium_k8s_service_host
+        if (k0s_cilium_k8s_service_host | length > 0)
+        else (k0s_api_external_address
+              if (k0s_api_external_address | length > 0)
+              else (hostvars[groups['k0s_controllers'][0]].ansible_host
+                    | default(groups['k0s_controllers'][0])))
+      }}
+
+- name: Build the Cilium Helm values
+  ansible.builtin.set_fact:
+    k0s_cilium_values: >-
+      {{
+        {
+          'kubeProxyReplacement': k0s_cilium_kube_proxy_replacement | bool,
+          'k8sServiceHost': k0s_cilium_service_host,
+          'k8sServicePort': k0s_cilium_k8s_service_port,
+          'operator': {'replicas': k0s_cilium_operator_replicas},
+          'ipam': {
+            'mode': 'cluster-pool',
+            'operator': {
+              'clusterPoolIPv4PodCIDRList': [k0s_pod_cidr],
+              'clusterPoolIPv4MaskSize': k0s_cilium_ipv4_mask_size
+            }
+          }
+        }
+        | combine(k0s_cilium_extra_values, recursive=True)
+      }}
+
+- name: Build the Helm extensions spec
+  ansible.builtin.set_fact:
+    k0s_helm_spec: >-
+      {{
+        {
+          'repositories': [
+            {'name': 'cilium', 'url': 'https://helm.cilium.io/'}
+          ],
+          'charts': [
+            {
+              'name': 'cilium',
+              'chartname': 'cilium/cilium',
+              'version': k0s_cilium_version,
+              'namespace': 'kube-system',
+              'values': k0s_cilium_values | to_nice_yaml(indent=2)
+            }
+          ]
+        }
+        if (k0s_cni == 'cilium') else {}
+      }}
+
+- name: Build the k0s ClusterConfig
+  ansible.builtin.set_fact:
+    k0s_cluster_config: >-
+      {{
+        {
+          'apiVersion': 'k0s.k0sproject.io/v1beta1',
+          'kind': 'ClusterConfig',
+          'metadata': {'name': k0s_cluster_name},
+          'spec': (
+            {
+              'api': (
+                {'port': k0s_api_port, 'k0sApiPort': k0s_api_k0s_port}
+                | combine({'externalAddress': k0s_api_external_address}
+                          if k0s_api_external_address | length > 0 else {})
+                | combine({'sans': k0s_effective_sans}
+                          if k0s_effective_sans | length > 0 else {})
+              ),
+              'storage': (
+                {'type': k0s_datastore}
+                | combine({'etcd': {'peerAddress': k0s_etcd_peer_address}}
+                          if k0s_datastore == 'etcd' else {})
+              ),
+              'network': (
+                {
+                  'provider': k0s_network_provider,
+                  'podCIDR': k0s_pod_cidr,
+                  'serviceCIDR': k0s_service_cidr
+                }
+                | combine({'kubeProxy': {'disabled': true}}
+                          if (k0s_disable_kube_proxy | bool) else {})
+                | combine({'controlPlaneLoadBalancing': k0s_cplb_spec}
+                          if (k0s_cplb_enabled | bool) else {})
+              ),
+              'telemetry': {'enabled': k0s_telemetry_enabled | bool}
+            }
+            | combine({'extensions': k0s_helm_spec}
+                      if (k0s_cni == 'cilium') else {})
+          )
+        }
+        | combine({'spec': k0s_config_extra}, recursive=True)
+      }}
+
+- name: Write /etc/k0s/k0s.yaml
+  ansible.builtin.template:
+    src: k0s.yaml.j2
+    dest: /etc/k0s/k0s.yaml
+    mode: "0600"
+  register: k0s_controller_config
+
+- name: Bootstrap the primary controller
+  ansible.builtin.include_tasks: bootstrap.yml
+  when: k0s_primary | bool
+
+- name: Join this node as an additional controller
+  ansible.builtin.include_tasks: join.yml
+  when: not (k0s_primary | bool)

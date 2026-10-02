@@ -1,0 +1,107 @@
+---
+# =============================================================================
+#  End-to-end k0s cluster deployment
+#
+#    ansible-playbook playbooks/site.yml
+#
+#  Pick the topology with k0s_topology in group_vars/all.yml:
+#      single | ha-cplb | ha-lb-single | ha-lb-ha
+#  and define the nodes with the k0s_*_hosts lists.
+# =============================================================================
+
+- import_playbook: _inventory.yml
+
+- name: Validate the settings
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Validate the topology value
+      ansible.builtin.assert:
+        that: k0s_topology in ['single', 'ha-cplb', 'ha-lb-single', 'ha-lb-ha']
+        fail_msg: "k0s_topology must be one of: single, ha-cplb, ha-lb-single, ha-lb-ha."
+
+    - name: Validate the CNI value
+      ansible.builtin.assert:
+        that: k0s_cni in ['kuberouter', 'calico', 'cilium']
+        fail_msg: "k0s_cni must be one of: kuberouter, calico, cilium."
+
+    - name: Require at least one controller
+      ansible.builtin.assert:
+        that: (groups['k0s_controllers'] | default([])) | length >= 1
+        fail_msg: "List at least one master in k0s_controllers_hosts."
+
+    - name: Single-node topology needs exactly one master
+      ansible.builtin.assert:
+        that: (groups['k0s_controllers'] | default([]) | length) == 1
+        fail_msg: "k0s_topology=single requires exactly one master."
+      when: k0s_topology == 'single'
+
+    - name: HA topologies need 3 or 5 masters
+      ansible.builtin.assert:
+        that: >-
+          (groups['k0s_controllers'] | default([]) | length) >= 3
+          and (groups['k0s_controllers'] | default([]) | length) % 2 == 1
+        fail_msg: "HA needs 3 or 5 masters (odd, for etcd quorum)."
+      when: k0s_topology != 'single'
+
+    - name: HA topologies need a VIP address
+      ansible.builtin.assert:
+        that: k0s_lb_vip | length > 0
+        fail_msg: "Set k0s_lb_vip (the CPLB VIP, the single LB host IP, or the floating VIP)."
+      when: k0s_topology != 'single'
+
+    - name: CPLB uses no external LB hosts
+      ansible.builtin.assert:
+        that: (groups['k0s_lb'] | default([]) | length) == 0
+        fail_msg: "k0s_topology=ha-cplb runs keepalived on the controllers; leave k0s_lb_hosts empty."
+      when: k0s_topology == 'ha-cplb'
+
+    - name: Single external LB needs exactly one LB host
+      ansible.builtin.assert:
+        that: (groups['k0s_lb'] | default([]) | length) == 1
+        fail_msg: "k0s_topology=ha-lb-single needs exactly one node in k0s_lb_hosts."
+      when: k0s_topology == 'ha-lb-single'
+
+    - name: HA external LB needs at least two LB hosts
+      ansible.builtin.assert:
+        that: (groups['k0s_lb'] | default([]) | length) >= 2
+        fail_msg: "k0s_topology=ha-lb-ha needs 2+ nodes in k0s_lb_hosts (for VIP failover)."
+      when: k0s_topology == 'ha-lb-ha'
+
+- name: Prerequisites on every cluster node
+  hosts: k0s_cluster
+  become: true
+  roles:
+    - k0s.platform.common
+
+- name: External load balancer (ha-lb-single / ha-lb-ha)
+  hosts: k0s_lb
+  become: true
+  roles:
+    - k0s.platform.loadbalancer
+  when: k0s_topology in ['ha-lb-single', 'ha-lb-ha']
+
+- name: Bootstrap the primary controller
+  hosts: "k0s_controllers[0]"
+  become: true
+  vars:
+    k0s_primary: true
+  roles:
+    - k0s.platform.controller
+
+- name: Join the additional controllers (HA only)
+  hosts: "k0s_controllers[1:]"
+  become: true
+  vars:
+    k0s_primary: false
+  roles:
+    - k0s.platform.controller
+  when: k0s_topology != 'single'
+
+- name: Join the workers
+  hosts: k0s_workers
+  become: true
+  roles:
+    - k0s.platform.worker
