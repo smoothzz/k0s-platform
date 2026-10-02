@@ -39,6 +39,13 @@ k0s_cilium_k8s_service_host: ""
 k0s_cilium_k8s_service_port: 6443
 k0s_cilium_extra_values: {}
 
+# --- Argo CD (optional) -----------------------------------------------------
+# Installed via k0s's Helm extension during cluster bootstrap.
+k0s_argocd_enabled: false
+k0s_argocd_version: "10.9.6"
+k0s_argocd_namespace: argocd
+k0s_argocd_values: {}
+
 # CPLB (k0s_topology == 'ha-cplb').
 k0s_cplb_auth_pass: k0s
 k0s_cplb_vip_cidr: "{{ k0s_lb_vip }}/24"

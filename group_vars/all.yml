@@ -92,6 +92,18 @@ k0s_cilium_ipv4_mask_size: 24
 # k0s_cilium_k8s_service_host: ""   # default: the VIP (HA) or first controller IP
 # k0s_cilium_extra_values: {}       # deep-merged over the generated values
 
+# --- Argo CD (optional) -----------------------------------------------------
+# Installed via k0s's Helm extension during cluster bootstrap.
+k0s_argocd_enabled: false
+k0s_argocd_version: "10.9.6"
+k0s_argocd_namespace: argocd
+# Extra chart values, e.g. expose the UI:
+#   k0s_argocd_values:
+#     server:
+#       service:
+#         type: NodePort
+k0s_argocd_values: {}
+
 # --- Cluster networking -----------------------------------------------------
 k0s_cluster_name: k0s
 k0s_pod_cidr: 10.244.0.0/16

@@ -105,25 +105,46 @@
         | combine(k0s_cilium_extra_values, recursive=True)
       }}
 
-- name: Build the Helm extensions spec
+- name: Build the Helm repositories
   ansible.builtin.set_fact:
-    k0s_helm_spec: >-
+    k0s_helm_repositories: >-
       {{
-        {
-          'repositories': [
-            {'name': 'cilium', 'url': 'https://helm.cilium.io/'}
-          ],
-          'charts': [
-            {
+        ([] if k0s_cni != 'cilium'
+            else [{'name': 'cilium', 'url': 'https://helm.cilium.io/'}])
+        + ([] if not (k0s_argocd_enabled | bool)
+            else [{'name': 'argo', 'url': 'https://argoproj.github.io/argo-helm'}])
+      }}
+
+- name: Build the Helm charts
+  ansible.builtin.set_fact:
+    k0s_helm_charts: >-
+      {{
+        ([] if k0s_cni != 'cilium'
+            else [{
               'name': 'cilium',
               'chartname': 'cilium/cilium',
               'version': k0s_cilium_version,
               'namespace': 'kube-system',
+              'order': 1,
               'values': k0s_cilium_values | to_nice_yaml(indent=2)
-            }
-          ]
-        }
-        if (k0s_cni == 'cilium') else {}
+            }])
+        + ([] if not (k0s_argocd_enabled | bool)
+            else [{
+              'name': 'argocd',
+              'chartname': 'argo/argo-cd',
+              'version': k0s_argocd_version,
+              'namespace': k0s_argocd_namespace,
+              'order': 10,
+              'values': k0s_argocd_values | to_nice_yaml(indent=2)
+            }])
+      }}
+
+- name: Build the Helm extensions spec
+  ansible.builtin.set_fact:
+    k0s_helm_spec: >-
+      {{
+        {'repositories': k0s_helm_repositories, 'charts': k0s_helm_charts}
+        if (k0s_helm_charts | length > 0) else {}
       }}
 
 - name: Build the k0s ClusterConfig
@@ -162,7 +183,7 @@
               'telemetry': {'enabled': k0s_telemetry_enabled | bool}
             }
             | combine({'extensions': k0s_helm_spec}
-                      if (k0s_cni == 'cilium') else {})
+                      if (k0s_helm_spec | length > 0) else {})
           )
         }
         | combine({'spec': k0s_config_extra}, recursive=True)

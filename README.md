@@ -173,6 +173,35 @@ when HA, otherwise the first controller's IP) and pod IPs come from
 > Changing the CNI on a running cluster requires a full redeploy — k0s cannot
 > switch providers in place.
 
+## Install Argo CD
+
+Set `k0s_argocd_enabled: true` and Argo CD is installed during bootstrap via
+k0s's Helm extension (same mechanism as Cilium) — no `helm` CLI needed.
+
+```yaml
+k0s_argocd_enabled: true
+k0s_argocd_version: "10.9.6"     # Helm chart version
+k0s_argocd_namespace: argocd
+k0s_argocd_values: {}            # extra chart values
+```
+
+The chart is applied after the CNI (order 1 vs 10), so its pods land on a ready
+network. Expose the UI however you like, e.g.:
+
+```yaml
+k0s_argocd_values:
+  server:
+    service:
+      type: NodePort
+```
+
+Retrieve the initial admin password after install:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d
+```
+
 ## How each HA topology works
 
 - **`ha-cplb`** — k0s renders `spec.network.controlPlaneLoadBalancing`
@@ -240,6 +269,10 @@ external proxy ⇒ non-controller hosts; LB on the masters ⇒ CPLB.
 | `k0s_cilium_operator_replicas` | `1` | Cilium operator replicas |
 | `k0s_cilium_k8s_service_host` | `""` | Cilium API host (default: VIP or first controller) |
 | `k0s_cilium_extra_values` | `{}` | Deep-merged over the generated Cilium values |
+| `k0s_argocd_enabled` | `false` | Install Argo CD during bootstrap |
+| `k0s_argocd_version` | `10.9.6` | Argo CD Helm chart version |
+| `k0s_argocd_namespace` | `argocd` | Argo CD namespace |
+| `k0s_argocd_values` | `{}` | Extra Argo CD chart values |
 | `k0s_config_extra` | `{}` | Deep-merged into the ClusterConfig `spec` |
 | `k0s_manage_firewall` | `false` | Open k0s ports with ufw/firewalld |
 
