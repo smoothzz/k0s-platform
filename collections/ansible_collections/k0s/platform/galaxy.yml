@@ -4,7 +4,7 @@ name: platform
 version: 1.0.0
 readme: README.md
 authors:
-  - thiago
+  - smoothzz
 description: >-
   Install and manage multi-node k0s Kubernetes clusters with selectable
   topologies (single, CPLB HA, single external LB, multi external LB HA)
@@ -18,8 +18,8 @@ tags:
   - highavailability
   - etcd
 dependencies: {}
-repository: https://github.com/example/k0s-platform
-documentation: https://github.com/example/k0s-platform
-issues: https://github.com/example/k0s-platform/issues
+repository: https://github.com/smoothzz/k0s-platform
+documentation: https://github.com/smoothzz/k0s-platform
+issues: https://github.com/smoothzz/k0s-platform/issues
 build_ignore:
   - "*.tar.gz"

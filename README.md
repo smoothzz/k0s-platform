@@ -252,10 +252,12 @@ external proxy ⇒ non-controller hosts; LB on the masters ⇒ CPLB.
 |----------|---------|-------------|
 | `k0s_topology` | `ha-lb-ha` | `single` / `ha-cplb` / `ha-lb-single` / `ha-lb-ha` |
 | `k0s_version` | `latest` | k0s version, e.g. `v1.31.2+k0s.0` |
+| `k0s_cluster_name` | `k0s` | Cluster name (ClusterConfig metadata) |
 | `k0s_lb_vip` | `192.168.1.100` | The stable address (CPLB VIP, single-LB IP, or floating VIP) |
 | `k0s_lb_interface` | `ens192` | NIC for the VIP (keepalived, `ha-lb-ha`) |
 | `k0s_lb_engine` | `envoy` | External proxy: `envoy` or `haproxy` |
 | `k0s_lb_envoy_version` | `latest` | Envoy release, or pin e.g. `1.39.1` |
+| `k0s_lb_vrrp_id` | `51` | Keepalived VRRP router ID (must be unique on the network) |
 | `k0s_cplb_vip_cidr` | `{{ k0s_lb_vip }}/24` | CPLB VIP with netmask |
 | `k0s_cplb_auth_pass` | `k0s` | CPLB VRRP password |
 | `k0s_cplb_interface` | `""` | CPLB VRRP NIC (empty = auto-detect) |
@@ -269,10 +271,12 @@ external proxy ⇒ non-controller hosts; LB on the masters ⇒ CPLB.
 | `k0s_cilium_operator_replicas` | `1` | Cilium operator replicas |
 | `k0s_cilium_k8s_service_host` | `""` | Cilium API host (default: VIP or first controller) |
 | `k0s_cilium_extra_values` | `{}` | Deep-merged over the generated Cilium values |
+| `k0s_service_cidr` | `10.96.0.0/12` | Kubernetes service CIDR (`k0s_pod_cidr` is the pod CIDR) |
 | `k0s_argocd_enabled` | `false` | Install Argo CD during bootstrap |
 | `k0s_argocd_version` | `10.9.6` | Argo CD Helm chart version |
 | `k0s_argocd_namespace` | `argocd` | Argo CD namespace |
 | `k0s_argocd_values` | `{}` | Extra Argo CD chart values |
+| `k0s_telemetry_enabled` | `false` | k0s telemetry |
 | `k0s_config_extra` | `{}` | Deep-merged into the ClusterConfig `spec` |
 | `k0s_manage_firewall` | `false` | Open k0s ports with ufw/firewalld |
 
