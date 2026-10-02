@@ -2,12 +2,12 @@
 - name: Require an interface for the floating VIP
   ansible.builtin.assert:
     that: k0s_lb_interface | length > 0
-    fail_msg: "Set k0s_lb_interface in group_vars/all.yml for keepalived."
+    fail_msg: "Set k0s_lb_interface in inventory/group_vars/all.yml for keepalived."
 
 - name: Require a VIP for keepalived
   ansible.builtin.assert:
     that: k0s_lb_vip | length > 0
-    fail_msg: "Set k0s_lb_vip in group_vars/all.yml for keepalived."
+    fail_msg: "Set k0s_lb_vip in inventory/group_vars/all.yml for keepalived."
 
 - name: Install keepalived
   ansible.builtin.package:
@@ -19,7 +19,7 @@
     src: keepalived.conf.j2
     dest: /etc/keepalived/keepalived.conf
     mode: "0644"
-  notify: restart keepalived
+  notify: Restart keepalived
 
 - name: Enable and start keepalived
   ansible.builtin.service:

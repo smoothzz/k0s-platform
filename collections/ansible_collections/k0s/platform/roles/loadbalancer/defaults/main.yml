@@ -26,6 +26,6 @@ k0s_lb_envoy_cluster_type: STATIC       # STATIC (IPs) | STRICT_DNS (hostnames)
 
 # Backends proxied to every controller. These are the k0s control plane ports.
 k0s_lb_backends:
-  - { name: kube_api,        port: 6443 }   # Kubernetes API
-  - { name: konnectivity,    port: 8132 }   # konnectivity
+  - { name: kube_api, port: 6443 }   # Kubernetes API
+  - { name: konnectivity, port: 8132 }   # konnectivity
   - { name: controller_join, port: 9443 }   # k0s controller join API

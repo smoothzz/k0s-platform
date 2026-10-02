@@ -1,5 +1,5 @@
 ---
-# Derived from k0s_topology (see group_vars/all.yml).
+# Derived from k0s_topology (see inventory/group_vars/all.yml).
 k0s_ha: "{{ k0s_topology != 'single' }}"
 k0s_cplb_enabled: "{{ k0s_topology == 'ha-cplb' }}"
 

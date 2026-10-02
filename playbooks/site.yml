@@ -4,12 +4,13 @@
 #
 #    ansible-playbook playbooks/site.yml
 #
-#  Pick the topology with k0s_topology in group_vars/all.yml:
+#  Pick the topology with k0s_topology in inventory/group_vars/all.yml:
 #      single | ha-cplb | ha-lb-single | ha-lb-ha
 #  and define the nodes with the k0s_*_hosts lists.
 # =============================================================================
 
-- import_playbook: _inventory.yml
+- name: Build the cluster inventory
+  import_playbook: _inventory.yml
 
 - name: Validate the settings
   hosts: localhost
@@ -80,25 +81,28 @@
   hosts: k0s_lb
   become: true
   roles:
-    - k0s.platform.loadbalancer
-  when: k0s_topology in ['ha-lb-single', 'ha-lb-ha']
+    - role: k0s.platform.loadbalancer
+      when: k0s_topology in ['ha-lb-single', 'ha-lb-ha']
 
 - name: Bootstrap the primary controller
-  hosts: "k0s_controllers[0]"
+  hosts: k0s_controllers
   become: true
   vars:
     k0s_primary: true
   roles:
-    - k0s.platform.controller
+    - role: k0s.platform.controller
+      when: inventory_hostname == groups['k0s_controllers'][0]
 
 - name: Join the additional controllers (HA only)
-  hosts: "k0s_controllers[1:]"
+  hosts: k0s_controllers
   become: true
   vars:
     k0s_primary: false
   roles:
-    - k0s.platform.controller
-  when: k0s_topology != 'single'
+    - role: k0s.platform.controller
+      when:
+        - k0s_topology != 'single'
+        - inventory_hostname != groups['k0s_controllers'][0]
 
 - name: Join the workers
   hosts: k0s_workers

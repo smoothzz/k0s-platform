@@ -1,0 +1,10 @@
+---
+ancestor: null
+releases:
+  1.0.0:
+    changes:
+      release_summary: >-
+        Initial release of the k0s.platform collection: multi-node k0s
+        deployment with selectable topology, CNI, external load balancing,
+        CPLB, and optional Argo CD.
+    release_date: "2026-10-02"

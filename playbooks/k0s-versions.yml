@@ -66,5 +66,5 @@
           - "Matching versions found: {{ k0s_shown_versions | length }}"
           - "Showing the newest {{ k0s_versions_limit }} (raise with -e k0s_versions_limit=N)"
           - >-
-            Pick one and set it in group_vars/all.yml, e.g.
+            Pick one and set it in inventory/group_vars/all.yml, e.g.
             k0s_version: {{ k0s_shown_versions[0] | default('vX.Y.Z+k0s.0') }}

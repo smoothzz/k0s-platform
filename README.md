@@ -19,8 +19,9 @@ owns the address.
 k0s-platform/
 ├── ansible.cfg                 # points at the local collection + inventory
 ├── requirements.yml            # ansible.posix, community.general
-├── inventory/hosts.ini         # optional static inventory (nodes usually in group_vars)
-├── group_vars/all.yml          # the only file you normally edit
+├── inventory/
+│   ├── hosts.ini               # optional static inventory (nodes usually in the lists)
+│   └── group_vars/all.yml      # the only file you normally edit
 ├── playbooks/
 │   ├── _inventory.yml          # builds groups from the k0s_*_hosts lists
 │   ├── site.yml                # full deployment
@@ -44,7 +45,7 @@ On a Linux control node with Ansible installed:
 ansible-galaxy collection install -r requirements.yml
 ```
 
-1. Edit `group_vars/all.yml`: pick `k0s_topology`, list your nodes, set the VIP
+1. Edit `inventory/group_vars/all.yml`: pick `k0s_topology`, list your nodes, set the VIP
    and SSH details.
 2. Deploy (add `-k -K` if you use passwords instead of SSH keys):
 
@@ -63,12 +64,12 @@ ansible-playbook playbooks/k0s-versions.yml -e k0s_versions_filter=v1.31
 ansible-playbook playbooks/k0s-versions.yml -e k0s_versions_include_prerelease=true
 ```
 
-Then pin it in `group_vars/all.yml`, e.g. `k0s_version: v1.31.2+k0s.0` (leave it
+Then pin it in `inventory/group_vars/all.yml`, e.g. `k0s_version: v1.31.2+k0s.0` (leave it
 as `latest` to always install the newest stable).
 
 ## Define your nodes
 
-Everything lives in `group_vars/all.yml`. Nodes are lists:
+Everything lives in `inventory/group_vars/all.yml`. Nodes are lists:
 
 ```yaml
 k0s_controllers_hosts:

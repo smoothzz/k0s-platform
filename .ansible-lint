@@ -1,0 +1,8 @@
+---
+# The collection deliberately exposes a single, documented `k0s_*` variable
+# namespace (see README "Notable variables"). Prefixing every variable with
+# its role name (common_/controller_/loadbalancer_/worker_) would make the
+# user-facing interface role-specific and break the documented names, so the
+# var-naming[no-role-prefix] rule is disabled on purpose.
+skip_list:
+  - var-naming[no-role-prefix]

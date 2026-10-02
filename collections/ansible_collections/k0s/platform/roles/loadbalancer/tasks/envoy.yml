@@ -55,14 +55,14 @@
     dest: "{{ k0s_lb_envoy_config_dir }}/envoy.yaml"
     mode: "0644"
     validate: "{{ k0s_lb_envoy_binary }} --mode validate -c %s"
-  notify: restart envoy
+  notify: Restart Envoy
 
 - name: Deploy the Envoy systemd unit
   ansible.builtin.template:
     src: envoy.service.j2
     dest: /etc/systemd/system/envoy.service
     mode: "0644"
-  notify: restart envoy
+  notify: Restart Envoy
 
 - name: Enable and start Envoy
   ansible.builtin.systemd:

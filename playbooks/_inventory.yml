@@ -1,5 +1,5 @@
 ---
-# Shared play: turn the k0s_*_hosts lists in group_vars/all.yml into live
+# Shared play: turn the k0s_*_hosts lists in inventory/group_vars/all.yml into live
 # inventory groups. Imported by site.yml and kubeconfig.yml.
 - name: Build the cluster inventory from group_vars
   hosts: localhost

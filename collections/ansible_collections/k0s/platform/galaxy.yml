@@ -17,6 +17,8 @@ tags:
   - cluster
   - highavailability
   - etcd
+  - infrastructure
+  - linux
 dependencies: {}
 repository: https://github.com/smoothzz/k0s-platform
 documentation: https://github.com/smoothzz/k0s-platform
